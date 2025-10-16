@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScamCheck Detector - Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="scam_panel.css" />
+  </head>
+  <body class="dark-theme">
+    <div class="container">
+      <!-- Theme Toggle Button -->
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+        <span class="theme-icon">🌙</span>
+      </button>
+
+      <h2>🛡️ ScamCheck Detector - Admin Panel</h2>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" data-tab="form">📰 Article Submissions</div>
+        <div class="tab" data-tab="sheets">🛡️ ScamCheck Detector Data</div>
+      </div>
+
+      <!-- Article Submission Form -->
+      <div class="tab-content active" id="form">
+        <div id="message" class="message"></div>
+
+        <div class="article-info-box">
+          <div class="info-box">
+            <strong>ℹ️ Info:</strong> Use this form to submit articles to the
+            ScamCheck Detector. You can also submit URLs directly from the
+            Google Sheets data below.
+          </div>
+          <form id="articleForm">
+            <label>Article URL:</label>
+            <input
+              type="url"
+              id="article_url"
+              name="article_url"
+              placeholder="https://example.com/article"
+              required
+            />
+
+            <label>Message Content:</label>
+            <textarea
+              id="message_content"
+              name="message_content"
+              placeholder="Enter your message..."
+              rows="5"
+              required
+            ></textarea>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+              🚀 Submit
+            </button>
+          </form>
+        </div>
+
+        <input
+          type="text"
+          class="search-box"
+          id="searchLocal"
+          placeholder="🔍 Search local records..."
+        />
+        <div class="table-wrapper">
+          <table id="localTable">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th style="width: 300px;">Article URL</th>
+                <th style="width: 400px;">Message</th>
+                <th style="width: 150px;">Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" class="loading-text" style="text-align: center; padding: 40px">
+                  ⏳ Loading...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Google Sheets Combined -->
+      <div class="tab-content" id="sheets">
+        <!-- Success Message for Sheet Tab -->
+        <div id="sheetMessage" class="message" style="display: none;"></div>
+
+        <button class="refresh-btn" onclick="loadCombinedSheetData()">
+          🔄 Refresh Data
+        </button>
+
+        <!-- Stats Cards -->
+        <div class="stats-card" id="statsCard" style="display: none">
+          <div class="stat-item">
+            <div class="stat-number" id="totalRows">0</div>
+            <div class="stat-label">Total Records</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="scamcheckRows">0</div>
+            <div class="stat-label">ScamCheck Detector</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="reportsRows">0</div>
+            <div class="stat-label">Reports</div>
+          </div>
+        </div>
+
+        <!-- Search Header -->
+        <div class="search-header">
+          <div class="search-title">
+            <span>🔍</span>
+            <span>Search in Question/Content</span>
+          </div>
+          <div class="search-input-wrapper">
+            <input
+              type="text"
+              class="search-box"
+              id="searchSheets"
+              placeholder="Type to search..."
+              style="margin-bottom: 0"
+            />
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="combinedSheetTable">
+            <thead>
+              <tr>
+                <th style="width: 35px; min-width: 35px;">Sr. no.</th>
+                <th style="width: 130px; min-width: 130px;">⏰ Timestamp</th>
+                <th style="width: 240px; min-width: 240px;">💬 Question</th>
+                <th style="width: 120px; min-width: 120px;">🏷️ Category</th>
+                <th style="width: 170px; min-width: 170px;">📧 Reason</th>
+                <th style="width: 170px; min-width: 170px;">📍 Source</th>
+                <th style="width: 120px; min-width: 120px;">📎 Attachment</th>
+                <th style="width: 130px; min-width: 130px;">📄 Sheet</th>
+                <th style="width: 100px; min-width: 100px;">✅ Status</th>
+                <th style="width: 350px; min-width: 350px;">⚡ Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="10" class="loading-text" style="text-align: center; padding: 50px">
+                  ⏳ Loading data...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let allCombinedData = [];
+      let submittedRows = {}; // Track submitted row indices with URLs
+
+      // Theme Toggle
+      function toggleTheme() {
+        const body = document.body;
+        const themeIcon = document.querySelector(".theme-icon");
+
+        if (body.classList.contains("dark-theme")) {
+          body.classList.remove("dark-theme");
+          body.classList.add("light-theme");
+          themeIcon.textContent = "☀️";
+          localStorage.setItem("theme", "light");
+        } else {
+          body.classList.remove("light-theme");
+          body.classList.add("dark-theme");
+          themeIcon.textContent = "🌙";
+          localStorage.setItem("theme", "dark");
+        }
+      }
+
+      // Load saved theme
+      window.addEventListener("DOMContentLoaded", () => {
+        const savedTheme = localStorage.getItem("theme") || "dark";
+        const themeIcon = document.querySelector(".theme-icon");
+
+        if (savedTheme === "light") {
+          document.body.classList.remove("dark-theme");
+          document.body.classList.add("light-theme");
+          themeIcon.textContent = "☀️";
+        }
+
+        // Load submitted rows from localStorage
+        const savedSubmitted = localStorage.getItem("submittedRows");
+        if (savedSubmitted) {
+          submittedRows = JSON.parse(savedSubmitted);
+        }
+      });
+
+      // Tab Switch
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-content")
+            .forEach((c) => c.classList.remove("active"));
+          tab.classList.add("active");
+          document.getElementById(tab.dataset.tab).classList.add("active");
+        });
+      });
+
+      // Edit URL function
+      function editURL(rowIndex) {
+        const urlInput = document.getElementById(`url_input_${rowIndex}`);
+        const submitBtn = document.getElementById(`submit_btn_${rowIndex}`);
+        const viewBtn = document.getElementById(`view_btn_${rowIndex}`);
+        const editBtn = document.getElementById(`edit_btn_${rowIndex}`);
+        const statusCell = document.getElementById(`status_${rowIndex}`);
+
+        // Enable editing
+        urlInput.disabled = false;
+        urlInput.focus();
+        
+        // Show submit button, hide view/edit buttons
+        submitBtn.style.display = 'inline-block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Update';
+        viewBtn.style.display = 'none';
+        editBtn.style.display = 'none';
+
+        // Update status
+        statusCell.innerHTML = '<span class="status-editing">✏️ Editing</span>';
+      }
+
+      // View URL function
+      function viewURL(rowIndex) {
+        const submittedURL = submittedRows[rowIndex];
+        if (submittedURL) {
+          // Create modal/alert to show URL
+          const confirmation = confirm(
+            `Submitted URL:\n\n${submittedURL}\n\nClick OK to open in new tab, or Cancel to close.`
+          );
+          if (confirmation) {
+            window.open(submittedURL, '_blank');
+          }
+        }
+      }
+
+      // Submit to Articles
+      function submitToArticles(rowIndex) {
+        const urlInput = document.getElementById(`url_input_${rowIndex}`);
+        const submitBtn = document.getElementById(`submit_btn_${rowIndex}`);
+        const viewBtn = document.getElementById(`view_btn_${rowIndex}`);
+        const editBtn = document.getElementById(`edit_btn_${rowIndex}`);
+        const statusCell = document.getElementById(`status_${rowIndex}`);
+        const url = urlInput.value.trim();
+
+        if (!url) {
+          alert("⚠️ Please enter a URL!");
+          return;
+        }
+
+        try {
+          new URL(url);
+        } catch (e) {
+          alert("⚠️ Please enter a valid URL");
+          return;
+        }
+
+        const rowData = allCombinedData[rowIndex];
+        submitBtn.disabled = true;
+        submitBtn.textContent = "⏳ Submitting...";
+
+        const formData = new FormData();
+        formData.append("article_url", url);
+        formData.append("message_content", rowData.question);
+
+        fetch("submit_form.php", { method: "POST", body: formData })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === "success") {
+              // Mark row as submitted with URL
+              submittedRows[rowIndex] = url;
+              localStorage.setItem("submittedRows", JSON.stringify(submittedRows));
+
+              // Update status cell
+              statusCell.innerHTML = '<span class="status-submitted">✅ Submitted</span>';
+              
+              // Disable input and show view/edit buttons
+              urlInput.disabled = true;
+              submitBtn.style.display = 'none';
+              viewBtn.style.display = 'inline-block';
+              editBtn.style.display = 'inline-block';
+
+              // Show success message in Article Submissions tab
+              document
+                .querySelectorAll(".tab")
+                .forEach((t) => t.classList.remove("active"));
+              document
+                .querySelectorAll(".tab-content")
+                .forEach((c) => c.classList.remove("active"));
+              document
+                .querySelector('[data-tab="form"]')
+                .classList.add("active");
+              document.getElementById("form").classList.add("active");
+
+              const msgDiv = document.getElementById("message");
+              msgDiv.className = "message success";
+              msgDiv.textContent = "✅ Successfully submitted! URL: " + url;
+              msgDiv.style.display = "block";
+              setTimeout(() => (msgDiv.style.display = "none"), 5000);
+
+              loadLocalData();
+
+              // Show message in Sheet tab too
+              const sheetMsgDiv = document.getElementById("sheetMessage");
+              sheetMsgDiv.className = "message success";
+              sheetMsgDiv.textContent = `✅ Row ${rowIndex + 1} submitted successfully to Article Submissions!`;
+              sheetMsgDiv.style.display = "block";
+              setTimeout(() => (sheetMsgDiv.style.display = "none"), 5000);
+
+            } else {
+              alert("❌ Error: " + data.message);
+              submitBtn.disabled = false;
+              submitBtn.textContent = submittedRows[rowIndex] ? "Update" : "Submit";
+            }
+          })
+          .catch((err) => {
+            alert("❌ Network error: " + err.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = submittedRows[rowIndex] ? "Update" : "Submit";
+          });
+      }
+
+      // Local DB
+      const form = document.getElementById("articleForm");
+      const msgDiv = document.getElementById("message");
+      const localTableBody = document.querySelector("#localTable tbody");
+
+      function loadLocalData() {
+        fetch("submit_form.php")
+          .then((res) => res.json())
+          .then((data) => {
+            localTableBody.innerHTML = "";
+            if (data.status === "success" && data.data.length > 0) {
+              data.data.forEach((r, index) => {
+                localTableBody.innerHTML += `
+                <tr>
+                  <td style="font-weight:700;">${index + 1}</td>
+                  <td><a href="${r.article_url}" target="_blank" class="url-link">${r.article_url}</a></td>
+                  <td>${r.message_content}</td>
+                  <td class="timestamp-text">${r.created_at}</td>
+                </tr>`;
+              });
+            } else {
+              localTableBody.innerHTML =
+                '<tr><td colspan="4" style="text-align:center; padding:40px;" class="no-data">📭 No records found.</td></tr>';
+            }
+          })
+          .catch(() => {
+            localTableBody.innerHTML =
+              '<tr><td colspan="4" style="text-align:center; padding:40px;" class="error-text">❌ Error loading data.</td></tr>';
+          });
+      }
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById("submitBtn");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "⏳ Submitting...";
+
+        const formData = new FormData(form);
+        fetch("submit_form.php", { method: "POST", body: formData })
+          .then((res) => res.json())
+          .then((data) => {
+            msgDiv.style.display = "block";
+            if (data.status === "success") {
+              msgDiv.className = "message success";
+              msgDiv.textContent = "✅ " + data.message;
+              form.reset();
+              loadLocalData();
+            } else {
+              msgDiv.className = "message error";
+              msgDiv.textContent = "❌ " + data.message;
+            }
+          })
+          .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "🚀 Submit";
+            setTimeout(() => (msgDiv.style.display = "none"), 4000);
+          });
+      });
+
+      document.getElementById("searchLocal").addEventListener("keyup", (e) => {
+        const val = e.target.value.toLowerCase();
+        document.querySelectorAll("#localTable tbody tr").forEach((tr) => {
+          tr.style.display = tr.textContent.toLowerCase().includes(val)
+            ? ""
+            : "none";
+        });
+      });
+
+      // Google Sheets
+      const SHEET_ID = "1O7aOxToumBBzHB6UqvIpwMkwg559o8FbOmt8AAC1TAI";
+
+      function getValueFromRow(row, keys, defaultValue = "-") {
+        for (let key of keys) {
+          const trimmedKey = key.trim();
+          if (
+            row[trimmedKey] !== undefined &&
+            row[trimmedKey] !== null &&
+            row[trimmedKey] !== ""
+          ) {
+            return row[trimmedKey];
+          }
+        }
+
+        for (let key of keys) {
+          const keyWithSpace = key + " ";
+          if (
+            row[keyWithSpace] !== undefined &&
+            row[keyWithSpace] !== null &&
+            row[keyWithSpace] !== ""
+          ) {
+            return row[keyWithSpace];
+          }
+        }
+
+        const rowKeys = Object.keys(row);
+        for (let key of keys) {
+          const normalizedKey = key.toLowerCase().trim();
+          const matchingKey = rowKeys.find(
+            (k) => k.toLowerCase().trim() === normalizedKey
+          );
+          if (
+            matchingKey &&
+            row[matchingKey] !== undefined &&
+            row[matchingKey] !== null &&
+            row[matchingKey] !== ""
+          ) {
+            return row[matchingKey];
+          }
+        }
+
+        return defaultValue;
+      }
+
+      async function loadCombinedSheetData() {
+        const tableBody = document.querySelector("#combinedSheetTable tbody");
+        const statsCard = document.getElementById("statsCard");
+
+        tableBody.innerHTML =
+          '<tr><td colspan="10" style="text-align:center; padding:50px;" class="loading-text">⏳ Loading data...</td></tr>';
+
+        let combinedData = [];
+
+        const sheetsToFetch = [
+          {
+            name: "scamcheck_detector",
+            url: `https://opensheet.elk.sh/${SHEET_ID}/scamcheck_detector`,
+            columns: ["Timestamp", "Question", "Category", "Reason", "Source"],
+          },
+          {
+            name: "Reports",
+            url: `https://opensheet.elk.sh/${SHEET_ID}/Reports`,
+            columns: [
+              "Timestamp",
+              "Content",
+              "Scam Type",
+              "Email",
+              "Details",
+              "Attachment Link",
+            ],
+          },
+        ];
+
+        for (const sheetInfo of sheetsToFetch) {
+          try {
+            const res = await fetch(sheetInfo.url);
+
+            if (!res.ok) continue;
+
+            const rows = await res.json();
+
+            if (rows.length > 0) {
+              const validRows = rows.filter((row) => {
+                const values = Object.values(row);
+                return values.some(
+                  (val) => val && val.toString().trim() !== ""
+                );
+              });
+
+              validRows.forEach((row, index) => {
+                if (sheetInfo.name === "scamcheck_detector") {
+                  combinedData.push({
+                    timestamp: getValueFromRow(row, ["Timestamp", "timestamp"]),
+                    question: getValueFromRow(row, ["Question", "question"]),
+                    category: getValueFromRow(
+                      row,
+                      ["Category", "category"],
+                      "unanswered"
+                    ),
+                    reason: getValueFromRow(
+                      row,
+                      ["Reason", "reason"],
+                      "No response"
+                    ),
+                    source: getValueFromRow(
+                      row,
+                      ["Source", "source"],
+                      "ScamCheck App"
+                    ),
+                    attachment: "No attachment",
+                    sheetName: "scamcheck_detector",
+                  });
+                } else if (sheetInfo.name === "Reports") {
+                  combinedData.push({
+                    timestamp: getValueFromRow(row, ["Timestamp", "timestamp"]),
+                    question: getValueFromRow(row, ["Content", "content"]),
+                    category: getValueFromRow(row, [
+                      "Scam Type",
+                      "scamType",
+                      "Scam_Type",
+                    ]),
+                    reason: getValueFromRow(row, ["Email", "email"]),
+                    source: getValueFromRow(row, ["Details", "details"]),
+                    attachment: getValueFromRow(
+                      row,
+                      ["Attachment Link", "attachmentLink", "Attachment_Link"],
+                      "No attachment"
+                    ),
+                    sheetName: "Reports",
+                  });
+                }
+              });
+            }
+          } catch (err) {
+            console.error(`Error loading ${sheetInfo.name}:`, err);
+          }
+        }
+
+        if (combinedData.length === 0) {
+          tableBody.innerHTML =
+            '<tr><td colspan="10" style="text-align:center; padding:50px;" class="error-text"><strong>⚠️ No data found</strong></td></tr>';
+          return;
+        }
+
+        combinedData.sort((a, b) => {
+          try {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          } catch {
+            return 0;
+          }
+        });
+
+        allCombinedData = combinedData;
+
+        // Update stats
+        const aiScamCount = combinedData.filter(
+          (r) => r.sheetName === "scamcheck_detector"
+        ).length;
+        const reportsCount = combinedData.filter(
+          (r) => r.sheetName === "Reports"
+        ).length;
+
+        document.getElementById("totalRows").textContent = combinedData.length;
+        document.getElementById("scamcheckRows").textContent = aiScamCount;
+        document.getElementById("reportsRows").textContent = reportsCount;
+        statsCard.style.display = "grid";
+
+        tableBody.innerHTML = combinedData
+          .map((row, index) => {
+            const isSubmitted = submittedRows.hasOwnProperty(index);
+            const submittedURL = submittedRows[index] || '';
+            return `
+        <tr data-question="${row.question.toLowerCase()}">
+          <td class="index-number">${index + 1}</td>
+          <td class="timestamp-text" style="font-size:11px;">${row.timestamp}</td>
+          <td style="max-width: 240px; word-wrap: break-word; line-height:1.6;">${row.question}</td>
+          <td><span class="category-badge">${row.category}</span></td>
+          <td class="secondary-text" style="max-width: 170px; word-wrap: break-word; font-size:12px;">${row.reason}</td>
+          <td class="tertiary-text" style="max-width: 170px; word-wrap: break-word; font-size:12px;">${row.source}</td>
+          <td style="text-align:center;">
+            ${
+              row.attachment !== "No attachment" &&
+              row.attachment.includes("http")
+                ? `<a href="${row.attachment}" target="_blank" class="link-button">📎 View</a>`
+                : '<span class="no-file">No file</span>'
+            }
+          </td>
+          <td style="text-align:center;">
+            <span class="badge ${
+              row.sheetName === "scamcheck_detector"
+                ? "badge-ai"
+                : "badge-reports"
+            }">
+              ${row.sheetName === "scamcheck_detector" ? "Detector" : "Reports"}
+            </span>
+          </td>
+          <td style="text-align:center;" id="status_${index}">
+            ${isSubmitted 
+              ? '<span class="status-submitted">✅ Submitted</span>' 
+              : '<span class="status-pending">⏳ Pending</span>'}
+          </td>
+          <td class="action-cell">
+            <div class="action-form">
+              <input 
+                type="url" 
+                id="url_input_${index}" 
+                class="action-input" 
+                placeholder="Enter URL..."
+                value="${submittedURL}"
+                ${isSubmitted ? 'disabled' : ''}
+              />
+              <button 
+                type="button" 
+                id="submit_btn_${index}" 
+                class="action-btn" 
+                onclick="submitToArticles(${index})"
+                style="${isSubmitted ? 'display:none;' : ''}"
+              >
+                Submit
+              </button>
+              <button 
+                type="button" 
+                id="view_btn_${index}" 
+                class="action-btn action-btn-view" 
+                onclick="viewURL(${index})"
+                style="${isSubmitted ? '' : 'display:none;'}"
+              >
+                👁️ View
+              </button>
+              <button 
+                type="button" 
+                id="edit_btn_${index}" 
+                class="action-btn action-btn-edit" 
+                onclick="editURL(${index})"
+                style="${isSubmitted ? '' : 'display:none;'}"
+              >
+                ✏️ Edit
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+          })
+          .join("");
+      }
+
+      document.getElementById("searchSheets").addEventListener("keyup", (e) => {
+        const searchVal = e.target.value.toLowerCase();
+        const rows = document.querySelectorAll("#combinedSheetTable tbody tr");
+
+        rows.forEach((tr) => {
+          const questionData = tr.getAttribute("data-question");
+          tr.style.display =
+            questionData && questionData.includes(searchVal) ? "" : "none";
+        });
+      });
+
+      window.onload = () => {
+        loadLocalData();
+        loadCombinedSheetData();
+      };
+    </script>
+  </body>
+</html>
