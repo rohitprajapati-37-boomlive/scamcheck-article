@@ -7,11 +7,24 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Database configuration for WAMP
-$db_host = 'localhost'; // localhost for WAMP
+// $db_host = 'localhost'; // localhost for WAMP
+// $db_user = 'root'; // Default username
+// $db_pass = ''; // Default password (blank)
+// $db_name = 'scamcheck_db';
+// $db_port = 3306;
+
+
+$db_host = 'https://phpmyadmin.coolify.vps.boomlive.in/'; // localhost for WAMP
 $db_user = 'root'; // Default username
-$db_pass = ''; // Default password (blank)
+$db_pass = 'abcd'; // Default password (blank)
 $db_name = 'scamcheck_db';
 $db_port = 3306;
+
+
+
+
+
+
 
 // Response array
 $response = [];
