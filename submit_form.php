@@ -1,30 +1,30 @@
 <?php
-// Set header to return JSON
-header('Content-Type: application/json');
+// CORS headers सबसे पहले
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header('Content-Type: application/json; charset=utf-8');
 
-// Enable error reporting for debugging
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Error reporting (production में बंद करें)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Database configuration for WAMP
-// $db_host = 'localhost'; // localhost for WAMP
-// $db_user = 'root'; // Default username
-// $db_pass = ''; // Default password (blank)
-// $db_name = 'scamcheck_db';
-// $db_port = 3306;
+// ✅ CORRECT Database configuration
+$db_host = 'coolify.vps.boomlive.in'; // बिना https:// के, बस hostname
+// या अगर internal connection है तो
+// $db_host = 'localhost'; 
+// या IP address: $db_host = '192.168.x.x';
 
-
-$db_host = 'https://phpmyadmin.coolify.vps.boomlive.in/'; // localhost for WAMP
-$db_user = 'root'; // Default username
-$db_pass = 'abcd'; // Default password (blank)
+$db_user = 'root';
+$db_pass = 'abcd';
 $db_name = 'scamcheck_db';
 $db_port = 3306;
-
-
-
-
-
-
 
 // Response array
 $response = [];
@@ -32,8 +32,9 @@ $response = [];
 try {
     // Create connection
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name, $db_port);
+    
     if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
+        throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
     // Set charset
@@ -52,32 +53,34 @@ try {
             throw new Exception("Please enter a valid URL.");
         }
 
-        $article_url = $conn->real_escape_string($article_url);
-        $message_content = $conn->real_escape_string($message_content);
+        // Use prepared statements (more secure)
+        $stmt = $conn->prepare("INSERT INTO article_submissions (article_url, message_content, created_at) VALUES (?, ?, NOW())");
+        $stmt->bind_param("ss", $article_url, $message_content);
 
-        $sql = "INSERT INTO article_submissions (article_url, message_content, created_at)
-                VALUES ('$article_url', '$message_content', NOW())";
-
-        if ($conn->query($sql)) {
+        if ($stmt->execute()) {
             $response = [
                 'status' => 'success',
                 'message' => 'Form submitted successfully!',
                 'insert_id' => $conn->insert_id
             ];
         } else {
-            throw new Exception("Database error: " . $conn->error);
+            throw new Exception("Database error: " . $stmt->error);
         }
+        
+        $stmt->close();
     }
 
     // ✅ GET REQUEST → Retrieve all records
     elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $sql = "SELECT id, article_url, message_content, created_at
+        $sql = "SELECT id, article_url, message_content, created_at 
                 FROM article_submissions ORDER BY created_at DESC";
         $result = $conn->query($sql);
 
         $data = [];
-        while ($row = $result->fetch_assoc()) {
-            $data[] = $row;
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
         }
 
         $response = [
@@ -95,6 +98,7 @@ try {
     $conn->close();
 
 } catch (Exception $e) {
+    http_response_code(500);
     $response = [
         'status' => 'error',
         'message' => $e->getMessage()
@@ -102,5 +106,5 @@ try {
 }
 
 // Return JSON
-echo json_encode($response, JSON_PRETTY_PRINT);
-?>
+echo json_encode($response);
+exit;
